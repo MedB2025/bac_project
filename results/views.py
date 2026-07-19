@@ -1,10 +1,10 @@
 import os
+import io  # <-- هذا هو السطر الذي تحتاجه بشدة لإصلاح الخطأ
 import openpyxl
 from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from .models import Eleve  # الإبقاء على الموديل الصحيح فقط وحذف الاستدعاء الخاطئ
-
+from .models import Eleve
 # 1. الصفحة الرئيسية: البحث أولاً ثم الأوائل الثلاثة
 def home_view(request):
     series = ['SN', 'M', 'LO', 'LM', 'TM', 'TS', 'LA']
