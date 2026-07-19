@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-your-secret-key-here'
 
 # 1. SÉCURITÉ : Désactiver le mode Debug en production
-DEBUG = False
+DEBUG = True
 
 # 2. AUTORISATION : Ajouter votre domaine PythonAnywhere et Render
 ALLOWED_HOSTS = ['bac2026.onrender.com', '127.0.0.1', 'localhost', '*']
