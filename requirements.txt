@@ -2,3 +2,4 @@ Django
 gunicorn
 pandas
 openpyxl
+whitenoise==6.6.0
