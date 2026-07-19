@@ -98,15 +98,14 @@
     </div>
     
     <!-- عند الضغط على الإعلان يتم توجيهه لصفحة الاتصال بك أو حسابك -->
-    <a href="mailto:mohamedbobeni@example.com?subject=طلب حجز مساحة إعلانية" class="block rounded-lg overflow-hidden group relative">
-        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/20 to-transparent opacity-50 z-10"></div>
-        
-        <!-- 🛠️ الحل هنا: استخدام تاج Django لاستدعاء مسار الصورة بشكل ديناميكي وآمن -->
-        <img src="{% static 'image.jpeg' %}" 
-            
-             class="w-full h-auto max-h-[110px] object-cover rounded-lg transition-transform duration-5xl group-hover:scale-[1.01] z-0"
-             loading="lazy">
-    </a>
+ <!-- تم حذف وسم الـ <a> وأصبح div عادي -->
+<div class="block rounded-lg overflow-hidden relative">
+    <div class="absolute inset-0 bg-gradient-to-t from-slate-950/20 to-transparent opacity-50 z-10"></div>
+    
+    <img src="{% static 'image.jpeg' %}" 
+         class="w-full h-auto max-h-[110px] object-cover rounded-lg z-0"
+         loading="lazy">
+</div>
 </div>
 
     {% else %}
