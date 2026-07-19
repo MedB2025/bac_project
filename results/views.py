@@ -111,64 +111,115 @@ def stats_view(request):
     return render(request, 'stats.html', context)
 
 # 3. رفع ملف الإكسيل وقراءة العناوين
+# 1. الدالة الأولى: ترفع الملف وتخزنه في مسار مؤقت وتمرر المسار فقط للجلسة
 def upload_excel_view(request):
     if request.method == "POST" and request.FILES.get('excel_file'):
         excel_file = request.FILES['excel_file']
         
-        # حفظ الملف في مجلد مؤقت آمن بالسيرفر بدلاً من الـ RAM
+        # إنشاء ملف مؤقت آمن وتخزين محتوى الإكسيل فيه
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
-    for chunk in excel_file.chunks():
-        temp_file.write(chunk)
+        for chunk in excel_file.chunks():
+            temp_file.write(chunk)
         temp_file.close()
         
-        # حفظ مسار الملف فقط في الـ Session
-    request.session['temp_excel_path'] = temp_file.name
+        # حفظ مسار الملف في الجلسة بدلاً من البيانات نفسها
+        request.session['temp_excel_path'] = temp_file.name
         
-    try:
+        try:
             workbook = openpyxl.load_workbook(temp_file.name, read_only=True)
             sheet = workbook.active
             headers = [str(cell.value).strip() for cell in next(sheet.iter_rows(max_row=1))]
             workbook.close()
             return render(request, 'mapping.html', {'headers': headers})
-    except Exception as e:
-            messages.error(request, f"خطأ في قراءة الملف: {e}")
+        except Exception as e:
+            messages.error(request, f"خطأ في قراءة ملف الإكسيل: {e}")
             return render(request, 'upload.html')
             
     return render(request, 'upload.html')
 
+# 2. الدالة الثانية: معالجة واستيراد البيانات باستخدام المسار المؤقت
 def import_mapped_data_view(request):
-    temp_path = request.session.get('temp_excel_path')
-    if not temp_path or not os.path.exists(temp_path):
-        messages.error(request, "انتهت الجلسة، يرجى إعادة الرفع.")
+    if request.method == "POST":
+        temp_path = request.session.get('temp_excel_path')
+        if not temp_path or not os.path.exists(temp_path):
+            messages.error(request, "انتهت صلاحية الجلسة، يرجى إعادة رفع الملف.")
+            return redirect('upload_excel')
+            
+        try:
+            idx_table = int(request.POST.get('col_table'))
+            idx_nom = int(request.POST.get('col_nom'))
+            idx_wilaya = int(request.POST.get('col_wilaya'))
+            idx_etablissement = int(request.POST.get('col_etablissement'))
+            idx_centre = int(request.POST.get('col_centre'))
+            idx_serie = int(request.POST.get('col_serie'))
+            idx_moyenne = int(request.POST.get('col_moyenne'))
+            idx_statut = int(request.POST.get('col_statut'))
+        except:
+            messages.error(request, "تأكد من اختيار كافة الأعمدة.")
+            return redirect('upload_excel')
+
+        try:
+            # فتح الملف من المسار المؤقت مباشرة
+            workbook = openpyxl.load_workbook(temp_path, read_only=True, data_only=True)
+            sheet = workbook.active
+            
+            Eleve.objects.all().delete()
+            students_batch = []
+            total_saved = 0
+            
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                if not row or len(row) <= max(idx_table, idx_nom, idx_wilaya, idx_etablissement, idx_centre, idx_serie, idx_moyenne, idx_statut):
+                    continue
+                
+                num_table = str(row[idx_table]).strip()
+                if not num_table or num_table.lower() == "none": continue
+                
+                moyenne_raw = str(row[idx_moyenne]).replace(',', '.').strip()
+                try: moyenne_val = float(moyenne_raw)
+                except: moyenne_val = 0.0
+                
+                raw_statut = str(row[idx_statut]).strip().lower()
+                if 'adm' in raw_statut or 'ناجح' in raw_statut: final_statut = 'Admis'
+                elif 'sess' in raw_statut or 'ثاني' in raw_statut or 'تكميل' in raw_statut: final_statut = 'Sessionaire'
+                elif 'abs' in raw_statut or 'غائب' in raw_statut or 'غايب' in raw_statut: final_statut = 'Absent'
+                elif 'ajou' in raw_statut or 'راسب' in raw_statut: final_statut = 'Ajourné'
+                else:
+                    final_statut = 'Admis' if moyenne_val >= 10.0 else 'Ajourné'
+
+                if moyenne_val >= 10.0 and final_statut == 'Ajourné': final_statut = 'Admis'
+
+                students_batch.append(Eleve(
+                    num_table=num_table,
+                    nom_complet=str(row[idx_nom]).strip(),
+                    wilaya=str(row[idx_wilaya]).strip(),
+                    etablissement=str(row[idx_etablissement]).strip(),
+                    centre=str(row[idx_centre]).strip(),
+                    serie=str(row[idx_serie]).strip().upper(),
+                    moyenne=moyenne_val,
+                    statut=final_statut
+                ))
+                
+                if len(students_batch) >= 500:
+                    Eleve.objects.bulk_create(students_batch)
+                    total_saved += len(students_batch)
+                    students_batch = []
+
+            if students_batch:
+                Eleve.objects.bulk_create(students_batch)
+                total_saved += len(students_batch)
+
+            workbook.close()
+            
+            # تنظيف: حذف الملف المؤقت وتفريغ الجلسة
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if 'temp_excel_path' in request.session:
+                del request.session['temp_excel_path']
+                
+            messages.success(request, f"تمت العملية بنجاح! تم حفظ {total_saved} طالب.")
+            
+        except Exception as e:
+            messages.error(request, f"حدث خطأ أثناء المعالجة: {e}")
+
         return redirect('upload_excel')
-        
-    try:
-        # قراءة الملف من القرص الصلب مباشرة (سريع جداً)
-        workbook = openpyxl.load_workbook(temp_path, read_only=True, data_only=True)
-        sheet = workbook.active
-        
-        # ... (بقية منطقك في استخراج الأعمدة كما هو) ...
-        # (تأكد من ترك منطق الـ idx_table وغيرها كما كانت)
-        
-        Eleve.objects.all().delete()
-        students_batch = []
-        total_saved = 0
-        
-        for row in sheet.iter_rows(min_row=2, values_only=True):
-            if not row: continue
-            # ... (باقي منطق معالجة الطلاب الذي كتبته أنت) ...
-            
-            # ... (كود الـ bulk_create الخاص بك) ...
-            
-        workbook.close()
-        
-        # تنظيف: حذف الملف المؤقت من السيرفر
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        del request.session['temp_excel_path']
-        
-        messages.success(request, f"تم بنجاح حفظ {total_saved} طالب.")
-    except Exception as e:
-        messages.error(request, f"خطأ: {e}")
-        
     return redirect('upload_excel')
