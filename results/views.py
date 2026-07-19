@@ -73,7 +73,8 @@ def stats_view(request):
     # تفعيل البحث والنتائج فقط في حال قام المستخدم باختيار ولاية محددة
     if selected_wilaya:
         has_filtered = True
-        students = Eleve.objects.filter(wilaya=selected_wilaya)
+        # إضافة الترتيب التنازلي حسب المعدل مباشرة عند بداية الفلترة
+        students = Eleve.objects.filter(wilaya=selected_wilaya).order_by('-moyenne')
         
         if selected_serie:
             students = students.filter(serie=selected_serie)
@@ -108,7 +109,6 @@ def stats_view(request):
         'selected_status': selected_status,
     }
     return render(request, 'stats.html', context)
-
 # 3. رفع ملف الإكسيل وقراءة العناوين
 # 3. رفع ملف الإكسيل وقراءة العناوين
 def upload_excel_view(request):
