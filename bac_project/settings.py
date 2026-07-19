@@ -6,10 +6,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-your-secret-key-here'
 
 # 1. SÉCURITÉ : Désactiver le mode Debug en production
-DEBUG = True
+DEBUG = False
 
 # 2. AUTORISATION : Ajouter votre domaine PythonAnywhere
-ALLOWED_HOSTS = [ '127.0.0.1','*']
+ALLOWED_HOSTS = [ 'bac2026.onrender.com','127.0.0.1','*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -23,6 +23,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',

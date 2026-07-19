@@ -111,44 +111,41 @@ def stats_view(request):
     return render(request, 'stats.html', context)
 
 # 3. رفع ملف الإكسيل وقراءة العناوين
+# 1. الدالة الأولى: ترفع الملف وتقرأ العناوين (وتمرر الملف مشفراً داخل الـ Session دون حفظه كملف على القرص)
 def upload_excel_view(request):
     if request.method == "POST" and request.FILES.get('excel_file'):
         excel_file = request.FILES['excel_file']
         
-        temp_dir = os.path.join(settings.BASE_DIR, 'temp_excel')
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
-            
-        file_path = os.path.join(temp_dir, 'uploaded_data.xlsx')
-        
-        with open(file_path, 'wb+') as destination:
-            for chunk in excel_file.chunks():
-                destination.write(chunk)
-                
         try:
-            workbook = openpyxl.load_workbook(file_path, read_only=True)
+            # قراءة الملف مباشرة من الذاكرة (RAM) لضمان السرعة وعدم الاعتماد على القرص الصلب المؤقت
+            file_in_memory = excel_file.read()
+            workbook = openpyxl.load_workbook(io.BytesIO(file_in_memory), read_only=True)
             sheet = workbook.active
             headers = [str(cell.value).strip() for cell in next(sheet.iter_rows(max_row=1))]
             workbook.close()
             
+            # حل مشكلة السيرفر: نحفظ محتوى الملف بشكل آمن داخل "جلسة المستخدم" Session ليمر بأمان للصفحة التالية
+            request.session['uploaded_excel_data'] = file_in_memory.decode('latin-1') 
+            
             return render(request, 'mapping.html', {'headers': headers})
         except Exception as e:
-            if os.path.exists(file_path):
-                os.remove(file_path)
             messages.error(request, f"خطأ في قراءة ملف الإكسيل: {e}")
             return render(request, 'upload.html')
             
     return render(request, 'upload.html')
 
-# 4. معالجة واستيراد البيانات المطابقة مع دعم كافة الحالات (ناجح، راسب، تكميلية، غائب)
+
+# 2. الدالة الثانية: معالجة واستيراد البيانات مع حماية الذاكرة العشوائية للسيرفر من الـ Crash
 def import_mapped_data_view(request):
     if request.method == "POST":
-        file_path = os.path.join(settings.BASE_DIR, 'temp_excel', 'uploaded_data.xlsx')
-        if not os.path.exists(file_path):
-            messages.error(request, "لم يتم العثور على الملف.")
+        # جلب بيانات الملف من الـ Session بأمان وضمان عدم اختفائها
+        file_data_raw = request.session.get('uploaded_excel_data')
+        if not file_data_raw:
+            messages.error(request, "انتهت صلاحية الجلسة أو لم يتم العثور على الملف، يرجى إعادة الرفع.")
             return redirect('upload_excel')
             
         try:
+            # جلب ترتيب الأعمدة التي اختارها المستخدم
             idx_table = int(request.POST.get('col_table'))
             idx_nom = int(request.POST.get('col_nom'))
             idx_wilaya = int(request.POST.get('col_wilaya'))
@@ -161,11 +158,17 @@ def import_mapped_data_view(request):
             messages.error(request, "تأكد من اختيار كافة الأعمدة.")
             return redirect('upload_excel')
 
-        students_to_create = []
-
         try:
-            workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+            # إعادة تحويل البيانات النصية إلى بايتس لقراءتها بواسطة openpyxl مجدداً
+            file_bytes = io.BytesIO(file_data_raw.encode('latin-1'))
+            workbook = openpyxl.load_workbook(file_bytes, read_only=True, data_only=True)
             sheet = workbook.active
+            
+            # مسح البيانات القديمة فوراً لتفريغ مساحة الداتابيز للبيانات الجديدة
+            Eleve.objects.all().delete()
+            
+            students_batch = []
+            total_saved = 0
             
             for row in sheet.iter_rows(min_row=2, values_only=True):
                 if not row: continue
@@ -179,9 +182,8 @@ def import_mapped_data_view(request):
                 try: moyenne_val = float(moyenne_raw)
                 except: moyenne_val = 0.0
                 
-                # الذكاء المطور لمعالجة كافة الحالات بدون أي أخطاء نصية
+                # إعداد الحالة (منطقك الذكي والمطور لمعالجة كافة الحالات)
                 raw_statut = str(row[idx_statut]).strip().lower()
-                
                 if 'adm' in raw_statut or 'ناجح' in raw_statut:
                     final_statut = 'Admis'
                 elif 'sess' in raw_statut or 'ثاني' in raw_statut or 'تكميل' in raw_statut:
@@ -191,13 +193,10 @@ def import_mapped_data_view(request):
                 elif 'ajou' in raw_statut or 'راسب' in raw_statut:
                     final_statut = 'Ajourné'
                 else:
-                    # صمام أمان مبني على المعدل في حال عدم تطابق النص نهائياً
-                    if moyenne_val >= 10.0:
-                        final_statut = 'Admis'
-                    else:
-                        final_statut = 'Ajourné'
+                    if moyenne_val >= 10.0: final_statut = 'Admis'
+                    else: final_statut = 'Ajourné'
 
-                # صمام أمان إضافي: حتى لو قرأ النظام من ملف الإكسيل نصاً خاطئاً وكان المعدل ناجحاً، يتم تصحيحه فوراً
+                # صمام أمان المعدل
                 if moyenne_val >= 10.0 and final_statut == 'Ajourné':
                     final_statut = 'Admis'
 
@@ -211,18 +210,29 @@ def import_mapped_data_view(request):
                     moyenne=moyenne_val,
                     statut=final_statut
                 )
-                students_to_create.append(student)
+                students_batch.append(student)
+                
+                # الاستراتيجية الأهم: كلما تجمعت دفعة من 500 طالب، يتم حفظهم فوراً في قاعدة البيانات وتفريغ الذاكرة
+                if len(students_batch) >= 500:
+                    Eleve.objects.bulk_create(students_batch)
+                    total_saved += len(students_batch)
+                    students_batch = [] # مسح وتصفير القائمة فوراً لتفريغ الـ RAM
+
+            # حفظ المتبقي الأخير من الطلاب إن وُجد (أقل من 500)
+            if students_batch:
+                Eleve.objects.bulk_create(students_batch)
+                total_saved += len(students_batch)
 
             workbook.close()
-
-            if students_to_create:
-                Eleve.objects.all().delete()
-                Eleve.objects.bulk_create(students_to_create, batch_size=500)
-                messages.success(request, f"تمت المزامنة بنجاح وحفظ {len(students_to_create)} طالب بكافة حالاتهم المختلفة.")
+            
+            # تنظيف الـ Session وحذف بيانات ملف الإكسيل منها بعد انتهاء الحفظ بنجاح
+            if 'uploaded_excel_data' in request.session:
+                del request.session['uploaded_excel_data']
+                
+            messages.success(request, f"تمت المزامنة بنجاح وحفظ {total_saved} طالب بكافة حالاتهم المختلفة بكفاءة عالية.")
+            
         except Exception as e:
-            messages.error(request, f"حدث خطأ: {e}")
-        finally:
-            if os.path.exists(file_path): os.remove(file_path)
+            messages.error(request, f"حدث خطأ أثناء استيراد البيانات: {e}")
 
         return redirect('upload_excel')
     return redirect('upload_excel')
