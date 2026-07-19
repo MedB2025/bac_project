@@ -8,8 +8,8 @@ SECRET_KEY = 'django-insecure-your-secret-key-here'
 # 1. SÉCURITÉ : Désactiver le mode Debug en production
 DEBUG = False
 
-# 2. AUTORISATION : Ajouter votre domaine PythonAnywhere
-ALLOWED_HOSTS = [ 'bac2026.onrender.com','127.0.0.1','*']
+# 2. AUTORISATION : Ajouter votre domaine PythonAnywhere et Render
+ALLOWED_HOSTS = ['bac2026.onrender.com', '127.0.0.1', 'localhost', '*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -23,7 +23,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', # تم التفعيل والتأكيد هنا
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -37,7 +37,6 @@ ROOT_URLCONF = 'bac_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-     
         'DIRS': [os.path.join(BASE_DIR, 'templates')], 
         'APP_DIRS': True,
         'OPTIONS': {
@@ -69,5 +68,11 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# 🛠️ التعديل الجديد: تعريف مجلد static الأصلي وتفعيل تخزين WhiteNoise
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
