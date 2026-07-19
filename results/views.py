@@ -1,7 +1,6 @@
 import os
-import io
 import openpyxl
-import tempfile  # <-- ضروري جداً
+from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from .models import Eleve
@@ -111,38 +110,42 @@ def stats_view(request):
     return render(request, 'stats.html', context)
 
 # 3. رفع ملف الإكسيل وقراءة العناوين
-# 1. الدالة الأولى: ترفع الملف وتخزنه في مسار مؤقت وتمرر المسار فقط للجلسة
+# 3. رفع ملف الإكسيل وقراءة العناوين
 def upload_excel_view(request):
     if request.method == "POST" and request.FILES.get('excel_file'):
         excel_file = request.FILES['excel_file']
         
-        # إنشاء ملف مؤقت آمن وتخزين محتوى الإكسيل فيه
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
-        for chunk in excel_file.chunks():
-            temp_file.write(chunk)
-        temp_file.close()
+        temp_dir = os.path.join(settings.BASE_DIR, 'temp_excel')
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+            
+        file_path = os.path.join(temp_dir, 'uploaded_data.xlsx')
         
-        # حفظ مسار الملف في الجلسة بدلاً من البيانات نفسها
-        request.session['temp_excel_path'] = temp_file.name
-        
+        with open(file_path, 'wb+') as destination:
+            for chunk in excel_file.chunks():
+                destination.write(chunk)
+                
         try:
-            workbook = openpyxl.load_workbook(temp_file.name, read_only=True)
+            workbook = openpyxl.load_workbook(file_path, read_only=True)
             sheet = workbook.active
             headers = [str(cell.value).strip() for cell in next(sheet.iter_rows(max_row=1))]
             workbook.close()
+            
             return render(request, 'mapping.html', {'headers': headers})
         except Exception as e:
+            if os.path.exists(file_path):
+                os.remove(file_path)
             messages.error(request, f"خطأ في قراءة ملف الإكسيل: {e}")
             return render(request, 'upload.html')
             
     return render(request, 'upload.html')
 
-# 2. الدالة الثانية: معالجة واستيراد البيانات باستخدام المسار المؤقت
+# 4. معالجة واستيراد البيانات المطابقة مع دعم كافة الحالات (ناجح، راسب، تكميلية، غائب)
 def import_mapped_data_view(request):
     if request.method == "POST":
-        temp_path = request.session.get('temp_excel_path')
-        if not temp_path or not os.path.exists(temp_path):
-            messages.error(request, "انتهت صلاحية الجلسة، يرجى إعادة رفع الملف.")
+        file_path = os.path.join(settings.BASE_DIR, 'temp_excel', 'uploaded_data.xlsx')
+        if not os.path.exists(file_path):
+            messages.error(request, "لم يتم العثور على الملف.")
             return redirect('upload_excel')
             
         try:
@@ -158,18 +161,16 @@ def import_mapped_data_view(request):
             messages.error(request, "تأكد من اختيار كافة الأعمدة.")
             return redirect('upload_excel')
 
+        students_to_create = []
+
         try:
-            # فتح الملف من المسار المؤقت مباشرة
-            workbook = openpyxl.load_workbook(temp_path, read_only=True, data_only=True)
+            workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
             sheet = workbook.active
             
-            Eleve.objects.all().delete()
-            students_batch = []
-            total_saved = 0
-            
             for row in sheet.iter_rows(min_row=2, values_only=True):
-                if not row or len(row) <= max(idx_table, idx_nom, idx_wilaya, idx_etablissement, idx_centre, idx_serie, idx_moyenne, idx_statut):
-                    continue
+                if not row: continue
+                required_len = max(idx_table, idx_nom, idx_wilaya, idx_etablissement, idx_centre, idx_serie, idx_moyenne, idx_statut) + 1
+                if len(row) < required_len: continue
                 
                 num_table = str(row[idx_table]).strip()
                 if not num_table or num_table.lower() == "none": continue
@@ -178,17 +179,29 @@ def import_mapped_data_view(request):
                 try: moyenne_val = float(moyenne_raw)
                 except: moyenne_val = 0.0
                 
+                # الذكاء المطور لمعالجة كافة الحالات بدون أي أخطاء نصية
                 raw_statut = str(row[idx_statut]).strip().lower()
-                if 'adm' in raw_statut or 'ناجح' in raw_statut: final_statut = 'Admis'
-                elif 'sess' in raw_statut or 'ثاني' in raw_statut or 'تكميل' in raw_statut: final_statut = 'Sessionaire'
-                elif 'abs' in raw_statut or 'غائب' in raw_statut or 'غايب' in raw_statut: final_statut = 'Absent'
-                elif 'ajou' in raw_statut or 'راسب' in raw_statut: final_statut = 'Ajourné'
+                
+                if 'adm' in raw_statut or 'ناجح' in raw_statut:
+                    final_statut = 'Admis'
+                elif 'sess' in raw_statut or 'ثاني' in raw_statut or 'تكميل' in raw_statut:
+                    final_statut = 'Sessionaire'
+                elif 'abs' in raw_statut or 'غائب' in raw_statut or 'غايب' in raw_statut:
+                    final_statut = 'Absent'
+                elif 'ajou' in raw_statut or 'راسب' in raw_statut:
+                    final_statut = 'Ajourné'
                 else:
-                    final_statut = 'Admis' if moyenne_val >= 10.0 else 'Ajourné'
+                    # صمام أمان مبني على المعدل في حال عدم تطابق النص نهائياً
+                    if moyenne_val >= 10.0:
+                        final_statut = 'Admis'
+                    else:
+                        final_statut = 'Ajourné'
 
-                if moyenne_val >= 10.0 and final_statut == 'Ajourné': final_statut = 'Admis'
+                # صمام أمان إضافي: حتى لو قرأ النظام من ملف الإكسيل نصاً خاطئاً وكان المعدل ناجحاً، يتم تصحيحه فوراً
+                if moyenne_val >= 10.0 and final_statut == 'Ajourné':
+                    final_statut = 'Admis'
 
-                students_batch.append(Eleve(
+                student = Eleve(
                     num_table=num_table,
                     nom_complet=str(row[idx_nom]).strip(),
                     wilaya=str(row[idx_wilaya]).strip(),
@@ -197,29 +210,19 @@ def import_mapped_data_view(request):
                     serie=str(row[idx_serie]).strip().upper(),
                     moyenne=moyenne_val,
                     statut=final_statut
-                ))
-                
-                if len(students_batch) >= 500:
-                    Eleve.objects.bulk_create(students_batch)
-                    total_saved += len(students_batch)
-                    students_batch = []
-
-            if students_batch:
-                Eleve.objects.bulk_create(students_batch)
-                total_saved += len(students_batch)
+                )
+                students_to_create.append(student)
 
             workbook.close()
-            
-            # تنظيف: حذف الملف المؤقت وتفريغ الجلسة
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            if 'temp_excel_path' in request.session:
-                del request.session['temp_excel_path']
-                
-            messages.success(request, f"تمت العملية بنجاح! تم حفظ {total_saved} طالب.")
-            
+
+            if students_to_create:
+                Eleve.objects.all().delete()
+                Eleve.objects.bulk_create(students_to_create, batch_size=500)
+                messages.success(request, f"تمت المزامنة بنجاح وحفظ {len(students_to_create)} طالب بكافة حالاتهم المختلفة.")
         except Exception as e:
-            messages.error(request, f"حدث خطأ أثناء المعالجة: {e}")
+            messages.error(request, f"حدث خطأ: {e}")
+        finally:
+            if os.path.exists(file_path): os.remove(file_path)
 
         return redirect('upload_excel')
     return redirect('upload_excel')
