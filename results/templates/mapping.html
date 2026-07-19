@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>مطابقة أعمدة الباكلوريا</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Tajawal', sans-serif; }</style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-6">
+
+    <div class="max-w-2xl w-full bg-slate-800/80 border border-slate-700/80 p-8 rounded-3xl shadow-2xl space-y-6 backdrop-blur">
+        <div class="text-center">
+            <span class="bg-blue-500/10 text-blue-400 font-bold px-3 py-1 rounded-full text-xs">خطوة مطابقة البيانات 📊</span>
+            <h2 class="text-2xl font-black text-slate-150 mt-2">ربط أعمدة Excel بحقول النظام</h2>
+            <p class="text-xs text-slate-400 mt-1">اختر العمود المقابل لكل معلومة من الملف المرفوع لضمان معالجة برمجية صحيحة 100%.</p>
+        </div>
+        
+        <form method="POST" action="{% url 'import_mapped_data' %}" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% csrf_token %}
+            
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">رقم المقعد (Numéro de Table):</label>
+                <select name="col_table" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-purple-500 outline-none">
+                    {% for head in headers %} <option value="{{ forloop.counter0 }}">{{ head }}</option> {% endfor %}
+                </select>
+            </div>
+
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">الاسم الكامل (Nom Complet):</label>
+                <select name="col_nom" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-purple-500 outline-none">
+                    {% for head in headers %} <option value="{{ forloop.counter0 }}">{{ head }}</option> {% endfor %}
+                </select>
+            </div>
+
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <label class="block text-xs font-bold text-slate-300 mb-1.5"> الولاية (wilaya):</label>
+                <select name="col_wilaya" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-purple-500 outline-none">
+                    {% for head in headers %} <option value="{{ forloop.counter0 }}">{{ head }}</option> {% endfor %}
+                </select>
+            </div>
+
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">المؤسسة التعليمية (Établissement):</label>
+                <select name="col_etablissement" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-purple-500 outline-none">
+                    {% for head in headers %} <option value="{{ forloop.counter0 }}">{{ head }}</option> {% endfor %}
+                </select>
+            </div>
+
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">مركز الامتحان (Centre):</label>
+                <select name="col_centre" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-purple-500 outline-none">
+                    {% for head in headers %} <option value="{{ forloop.counter0 }}">{{ head }}</option> {% endfor %}
+                </select>
+            </div>
+
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">الشعبة (Série):</label>
+                <select name="col_serie" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-purple-500 outline-none">
+                    {% for head in headers %} <option value="{{ forloop.counter0 }}">{{ head }}</option> {% endfor %}
+                </select>
+            </div>
+
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">المعدل العام (Moyenne):</label>
+                <select name="col_moyenne" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-purple-500 outline-none">
+                    {% for head in headers %} <option value="{{ forloop.counter0 }}">{{ head }}</option> {% endfor %}
+                </select>
+            </div>
+
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 md:col-span-2">
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">النتيجة والقرار النهائي (Statut):</label>
+                <select name="col_statut" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-purple-500 outline-none">
+                    {% for head in headers %} <option value="{{ forloop.counter0 }}">{{ head }}</option> {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="md:col-span-2 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-purple-900/20 mt-4 tracking-wide text-sm">
+                تأكيد المطابقة وحفظ النتائج في قاعدة البيانات 🚀
+            </button>
+        </form>
+    </div>
+
+</body>
+</html>

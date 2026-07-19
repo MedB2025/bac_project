@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>منصة البكالوريا 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- مكتبة تأثير تطاير الورود الاحتفالية -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body { font-family: 'Tajawal', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+    <!-- شريط التنقل العلوي -->
+    <nav class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-50 px-4 sm:px-6 py-4 flex justify-between items-center">
+        <a href="{% url 'home' %}" class="text-lg sm:text-xl font-black bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">🎓 منصة البكالوريا</a>
+        <a href="{% url 'stats' %}" class="bg-slate-800 hover:bg-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition border border-slate-700">📊 الإحصائيات</a>
+    </nav>
+
+    <div class="max-w-6xl mx-auto px-4 py-8 sm:py-12 space-y-10 sm:space-y-16">
+        
+        <!-- قسم البحث بالأعلى -->
+        <div class="max-w-2xl mx-auto text-center space-y-4 sm:space-y-6">
+            <h1 class="text-3xl font-black tracking-tight text-white sm:text-5xl">ابحث عن نتيجتك فوراً</h1>
+
+            
+            <form method="GET" action="{% url 'home' %}" class="flex gap-2 p-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl focus-within:border-blue-500 transition">
+                <input type="number" pattern="[0-9]*" inputmode="numeric" name="q" placeholder="أدخل رقم الباكلوريا هنا..." required class="w-full bg-transparent px-3 py-2.5 sm:py-3 outline-none text-slate-100 placeholder-slate-500 text-sm sm:text-base">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 font-bold px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl transition text-xs sm:text-sm shrink-0 shadow-lg shadow-blue-500/10">بحث سريع 🔍</button>
+            </form>
+        </div>
+
+        <!-- عرض نتيجة البحث الفردي -->
+<!-- عرض نتيجة البحث الفردي -->
+{% if searched %}
+<div id="result-box" class="max-w-2xl mx-auto bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl relative overflow-hidden">
+    {% if student %}
+        <!-- 1. التحكم في لون الخط العلوي بناءً على الحالة بدقة -->
+        <div class="absolute top-0 right-0 left-0 h-1.5 
+            {% if student.statut == 'Admis' %}bg-green-500
+            {% elif student.statut == 'Sessionaire' %}bg-yellow-500
+            {% elif student.statut == 'Absent' %}bg-gray-500
+            {% else %}bg-red-500{% endif %}">
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-between items-start gap-6">
+            <div class="space-y-3 w-full sm:w-auto text-center sm:text-right">
+                
+                <!-- 2. شارة الحالة الملونة والنصوص الصحيحة لكل حالة -->
+                <span id="student-status" class="inline-block px-3 py-1 text-xs font-bold rounded-full 
+                    {% if student.statut == 'Admis' %}bg-green-500/10 text-green-400
+                    {% elif student.statut == 'Sessionaire' %}bg-yellow-500/10 text-yellow-400
+                    {% elif student.statut == 'Absent' %}bg-gray-500/10 text-gray-400
+                    {% else %}bg-red-500/10 text-red-400{% endif %}">
+                    
+                    {% if student.statut == 'Admis' %}
+                       🎉 ألف مبروووك ناجح 🎉
+                    {% elif student.statut == 'Sessionaire' %}
+                        الدورة التكميلية 
+                    {% elif student.statut == 'Absent' %}
+                         غائب 
+                    {% else %}
+                         حظ أوفر 
+                    {% endif %}
+                </span>
+
+                <h3 class="text-xl sm:text-2xl font-black text-white">{{ student.nom_complet }}</h3>
+                <div class="p-3 bg-slate-950/50 rounded-xl space-y-1.5 text-xs text-slate-400 text-right">
+                    <p>رقم المقعد: <span class="text-slate-200 font-bold">{{ student.num_table }}</span> | الشعبة: <span class="text-slate-200 font-bold">{{ student.serie }}</span></p>
+                    <p>المدرسة: <span class="text-slate-200 font-bold">{{ student.etablissement }}</span></p>
+                    <p>الولاية: <span class="text-slate-200 font-bold">{{ student.wilaya }}</span></p>
+                </div>
+            </div>
+            
+            <div class="flex sm:flex-col justify-between sm:justify-start items-center sm:items-end w-full sm:w-auto border-t sm:border-t-0 border-slate-800 pt-4 sm:pt-0">
+                <div class="text-right">
+                    <div class="text-xs text-slate-500 font-bold">المعدل العام</div>
+                    <div class="text-3xl sm:text-4xl font-black text-cyan-400 mt-1">{{ student.moyenne|floatformat:2 }}</div>
+                </div>
+                {% if rank %}
+                    <div class="bg-yellow-500/10 text-yellow-400 text-xs font-bold px-2.5 py-1 rounded-lg mt-2">🏆 الترتيب: {{ rank }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+
+
+        <!-- 💰 مساحة إعلان ممول ومدفوع (تظهر أسفل النتيجة مباشرة) -->
+       <!-- 💰 مساحة إعلان ممول جاهزة للحجز (بحجم أصغر وأكثر تناسقاً) -->
+<div class="mt-4 max-w-xl mx-auto bg-slate-950/40 border border-slate-800/80 p-2.5 rounded-xl shadow-xl relative overflow-hidden backdrop-blur-sm transition-all duration-300 hover:border-cyan-500/30">
+    <div class="flex justify-between items-center mb-1.5 px-1">
+        <span class="text-[9px] text-slate-500 font-bold tracking-wider">مساحة إعلانية شاغرة</span>
+        <span class="text-[9px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full font-bold animate-pulse">متاح للإيجار ⚡</span>
+    </div>
+    
+    <!-- عند الضغط على الإعلان يتم توجيهه لصفحة الاتصال بك أو حسابك -->
+    <a href="mailto:mohamedbobeni@example.com?subject=طلب حجز مساحة إعلانية" class="block rounded-lg overflow-hidden group relative">
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/20 to-transparent opacity-50 z-10"></div>
+        
+        <!-- ضع الصورة التي قمت بتوليدها هنا باسم placeholder.jpg -->
+        <img src="/static/image.jpeg" 
+             alt="احجز مساحتك الإعلانية" 
+             class="w-full h-auto max-h-[110px] object-cover rounded-lg transition-transform duration-5xl group-hover:scale-[1.01] z-0"
+             loading="lazy">
+    </a>
+</div>
+
+
+
+    {% else %}
+        <!-- في حال لم يتم العثور على الطالب -->
+        <div class="text-center py-6 space-y-2">
+            <div class="text-3xl">🔍</div>
+            <p class="text-xs sm:text-sm font-bold text-slate-300">رقم الباكلوريا غير موجود، يرجى التأكد.</p>
+        </div>
+    {% endif %}
+</div>
+{% endif %}
+
+        <!-- لوحة الأوائل الثلاثة -->
+   <!-- لوحة الأوائل الثلاثة - تختفي عند البحث -->
+        {% if not searched %}
+        <div id="top-students-panel" class="space-y-6 transition-all duration-500">
+            <div class="text-center space-y-2">
+                <h2 class="text-xl sm:text-2xl font-black text-white">🏆   المتفوقين الأوائل</h2>
+                <p class="text-[11px] sm:text-xs text-slate-400">الثلاثة الأوائل الحاصلين على أعلى معدل وطني من كل شعبة</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for serie, students in top_students.items %}
+                    <div class="bg-slate-900/40 border border-slate-900 p-4 sm:p-6 rounded-2xl space-y-3">
+                        <div class="flex justify-between items-center border-b border-slate-800/80 pb-2">
+                            <span class="text-xs sm:text-sm font-black text-white">شعبة: {{ serie }}</span>
+                            <span class="bg-cyan-500/10 text-cyan-400 text-[9px] font-bold px-2 py-0.5 rounded-full">الأعلى معدلاً</span>
+                        </div>
+                        <div class="space-y-2">
+                            {% for st in students %}
+                                <div class="flex justify-between items-center bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/50 hover:border-slate-700 transition">
+                                    <div class="flex items-center gap-2 overflow-hidden">
+                                        <span class="text-xs font-bold {% if forloop.counter == 1 %}text-yellow-400{% elif forloop.counter == 2 %}text-slate-300{% else %}text-amber-600{% endif %}">#{{ forloop.counter }}</span>
+                                        <div class="text-xs font-medium text-slate-200 truncate max-w-[120px] sm:max-w-[140px]">{{ st.nom_complet }}</div>
+                                    </div>
+                                    <!-- تحديث: عرض رقمين بعد الفاصلة -->
+                                    <div class="text-xs font-black text-cyan-400 shrink-0">{{ st.moyenne|floatformat:2 }}</div>
+                                </div>
+                            {% empty %}
+                                <p class="text-[10px] text-slate-500 text-center py-2">لا توجد بيانات حالياً.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const statusElement = document.getElementById('student-status');
+            const topPanel = document.getElementById('top-students-panel');
+            
+            if (statusElement) {
+                if (statusElement.innerText.includes('ناجح') || statusElement.innerText.includes('Admis')) {
+                    if (topPanel) {
+                        topPanel.classList.add('opacity-0', 'pointer-events-none', 'hidden');
+                    }
+
+                    var duration = 4 * 1000;
+                    var end = Date.now() + duration;
+
+                    (function frame() {
+                        confetti({
+                            particleCount: 4,
+                            angle: 60,
+                            spread: 55,
+                            origin: { x: 0, y: 0.8 }
+                        });
+                        confetti({
+                            particleCount: 4,
+                            angle: 120,
+                            spread: 55,
+                            origin: { x: 1, y: 0.8 }
+                        });
+
+                        if (Date.now() < end) {
+                            requestAnimationFrame(frame);
+                        }
+                    }());
+                }
+            }
+        });
+    </script>
+</body>
+</html>
