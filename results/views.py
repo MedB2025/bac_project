@@ -42,11 +42,9 @@ def home_view(request):
     }
     return render(request, 'home.html', context)
 
-
-# 2. صفحة الفرز والإحصائيات الذكية والمتجاوبة
-# 2. صفحة الفرز والإحصائيات الذكية والمتجاوبة (نسخة الفلترة الديناميكية تلقائياً)
+# 2. بناء قوائم الخيارات بشكل ديناميكي من قاعدة البيانات لكافة الفلاتر
 def stats_view(request):
-    # 1. استقبال قيم الفلاتر من الطلب (GET)
+   
     selected_wilaya = request.GET.get('wilaya', '')
     selected_serie = request.GET.get('serie', '')
     selected_school = request.GET.get('etablissement', '')
