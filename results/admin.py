@@ -1,3 +1,5 @@
 from django.contrib import admin
+from .models import Eleve
 
-# Register your models here.
+# تسجيل جدول الطلاب لكي يظهر في لوحة التحكم
+admin.site.register(Eleve)
